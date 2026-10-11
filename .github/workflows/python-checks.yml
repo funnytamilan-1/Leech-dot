@@ -1,0 +1,40 @@
+name: Python checks
+
+on:
+  push:
+    branches: [main, "import/**"]
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  syntax:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - name: Compile Python files
+        run: |
+          python - <<'PY'
+          import pathlib
+          import py_compile
+          import sys
+
+          files = sorted(pathlib.Path(".").rglob("*.py"))
+          excluded = {".git", ".venv", "venv", "__pycache__"}
+          files = [p for p in files if not any(part in excluded for part in p.parts)]
+          if not files:
+              print("No Python files found; source import may be incomplete.")
+              sys.exit(1)
+          failed = []
+          for path in files:
+              try:
+                  py_compile.compile(str(path), doraise=True)
+              except Exception as exc:
+                  failed.append((str(path), str(exc)))
+          for path, error in failed:
+              print(f"FAIL: {path}: {error}")
+          print(f"Checked {len(files)} Python files; failures: {len(failed)}")
+          sys.exit(bool(failed))
+          PY
